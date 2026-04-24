@@ -1,0 +1,5 @@
+2026-04-24 00:01:14,120 - ERROR - [routes.py:1042] - Dekripsi gagal: Invalid padding length
+Traceback (most recent call last):
+  File "D:\Sistem\CloneSistem\backend\app\routes.py", line 984, in aesga_decrypt_info
+    raise ValueError("Invalid padding length")
+ValueError: Invalid padding length

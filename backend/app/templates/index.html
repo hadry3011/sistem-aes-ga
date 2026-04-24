@@ -1,0 +1,51 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='assets/git-repository-private-fill.svg') }}">
+  <title>Halaman Awal Sistem AES</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      text-align: center;
+      background-color: #ffffff;
+      padding: 50px;
+      border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    h1 { color: #333333; margin-bottom: 20px; }
+    p { font-size: 18px; color: #555555; margin-bottom: 30px; }
+    .menu-button {
+      display: inline-block;
+      margin: 10px;
+      padding: 15px 30px;
+      font-size: 16px;
+      color: #fff;
+      background-color: #007bff;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      text-decoration: none;
+    }
+    .menu-button:hover { background-color: #0056b3; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Sistem Pengamanan Dokumen</h1>
+    <p>Pilih mode enkripsi yang ingin Anda gunakan:</p>
+    <a href="{{ url_for('main.aes') }}" class="menu-button">Mode AES</a>
+    <a href="{{ url_for('main.aes_ga') }}" class="menu-button">Mode AES + GA</a>
+  </div>
+</body>
+</html>
