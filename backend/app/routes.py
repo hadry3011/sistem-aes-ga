@@ -39,7 +39,7 @@ def bytes_to_bitstring(data: bytes) -> str:
 # =========================
 @bp.errorhandler(RequestEntityTooLarge)
 def handle_file_too_large(e):
-    return jsonify(ok=False, error="Ukuran file melebihi 2MB."), 413
+    return jsonify(ok=False, error="Ukuran file melebihi 5MB (termasuk metadata)."), 413
 
 # =========================
 # PAGES

@@ -12,48 +12,49 @@ function formatKB(bytes) {
  * @returns {string} HTML string untuk stepper
  */
 function renderProcessStepper(currentStep, stepNames) {
-  const totalSteps = stepNames.length;
-  const isEncryption = stepNames[0] === "Key Expansion";
-  const title = isEncryption ? "Proses Enkripsi" : "Proses Dekripsi";
-
-  let html = `<div style="margin-bottom:20px;">`;
+  const isEncryption = stepNames.includes("Key Expansion") || stepNames.includes("Initial Round");
+  const title = isEncryption ? "PROSES ENKRIPSI" : "PROSES DEKRIPSI";
   
-  // Judul teks dan Ikon informasi lingkaran biru
-  html += `
-    <div style="text-align:center; margin-bottom:15px; display: flex; align-items: center; justify-content: center; gap: 12px;">
-      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #333;">${title}</h3>
-      <div style="display:inline-flex; align-items:center; justify-content:center; width:35px; height:35px; border-radius:50%; background:#e7f3ff; color:#007bff; border:2px solid #007bff; font-size:18px; font-weight:bold; font-family:serif;">
-        i
+  let html = `
+    <div style="text-align:center; margin-bottom:20px;">
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: #1f6feb; text-transform: uppercase; letter-spacing: 1px;">${title}</h2>
+      <div style="margin-top: 8px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1f6feb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
       </div>
-    </div>`;
+    </div>
+    <div class="stepper-container">
+  `;
 
-  html += `<div style="display:flex; justify-content:space-between; align-items:center; gap:5px; flex-wrap:nowrap; background:#f8f9fa; padding:12px; border-radius:10px; border:1px solid #dee2e6;">`;
+  stepNames.forEach((name, i) => {
+    const stepNum = i + 1;
+    let statusClass = "";
+    if (stepNum < currentStep) statusClass = "completed";
+    else if (stepNum === currentStep) statusClass = "active";
 
-  for (let i = 1; i <= totalSteps; i++) {
-    let bgColor, textColor, icon, boxShadow;
-    if (i < currentStep) {
-      bgColor = '#28a745'; textColor = '#fff'; icon = '✓ '; boxShadow = '0 2px 4px rgba(40, 167, 69, 0.3)';
-    } else if (i === currentStep) {
-      bgColor = '#007bff'; textColor = '#fff'; icon = '● '; boxShadow = '0 2px 8px rgba(0, 123, 255, 0.4)';
-    } else {
-      bgColor = '#e9ecef'; textColor = '#6c757d'; icon = ''; boxShadow = 'none';
-    }
+    html += `
+      <div class="stepper-item ${statusClass}">
+        <div class="stepper-circle">${stepNum < currentStep ? '✔' : stepNum}</div>
+        <div class="stepper-label">${name}</div>
+        <div class="stepper-line"></div>
+      </div>
+    `;
+  });
 
-    if (i > 1) {
-      const lineColor = i <= currentStep ? '#28a745' : '#dee2e6';
-      html += `<div style="flex:1; height:3px; background:${lineColor}; min-width:5px;"></div>`;
-    }
-
-    html += `<div style="flex:0 0 auto; padding:6px 10px; background:${bgColor}; color:${textColor}; border-radius:12px; font-size:10px; font-weight:600; text-align:center; box-shadow:${boxShadow};">
-        ${icon}${stepNames[i-1]}
-      </div>`;
-  }
-  html += `</div></div>`;
+  html += `</div>`;
   return html;
 }
 
 function showAlert(title, text, icon) {
-  Swal.fire({ title, text, icon, confirmButtonText: "OK" });
+  Swal.fire({ 
+    title, 
+    text, 
+    icon, 
+    confirmButtonText: "Selesai",
+    customClass: {
+      confirmButton: 'custom-swal-btn swal-btn-finish'
+    },
+    buttonsStyling: false
+  });
 }
 
 function setNote(msg, isError = true) {
@@ -94,6 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const fname = gid("fname");
   const fsize = gid("fsize");
   const fmode = gid("fmode");
+  const plaintextOut = gid("plaintext_out");
 
   const maxFileSize = 2 * 1024 * 1024;
   const allowedExtensions = ["pdf", "docx"];
@@ -113,6 +115,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let generatedKeyB64 = null;
   let generatedKeyHex = null;
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        // Hapus prefix "data:*/*;base64,"
+        const b64 = reader.result.split(',')[1];
+        resolve(b64);
+      };
+      reader.onerror = error => reject(error);
+    });
+  }
+
+  function b64ToBlob(b64Data, contentType = '', sliceSize = 512) {
+    const byteCharacters = atob(b64Data);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+      const slice = byteCharacters.slice(offset, offset + sliceSize);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    return new Blob(byteArrays, { type: contentType });
+  }
 
   function setEnabled(el, enabled) {
     if (!el) return;
@@ -226,10 +256,15 @@ document.addEventListener("DOMContentLoaded", () => {
         
         await Swal.fire({
           title: "Kunci Berhasil Dibuat!",
-          html: `Kunci diturunkan dari isi file secara deterministik.`,
+          html: `
+            <div style="text-align: left; font-family: monospace; font-size: 13px;">
+              <p><b>Nama File:</b> ${data.filename}</p>
+              <p><b>Base64:</b><br><textarea style="width:100%; height:50px; font-size:11px;" readonly>${data.key_b64}</textarea></p>
+              <p><b>Hex:</b><br><textarea style="width:100%; height:50px; font-size:11px;" readonly>${data.key_hex}</textarea></p>
+            </div>
+          `,
           icon: "success",
-          timer: 1500,
-          showConfirmButton: false
+          confirmButtonText: "OK"
         });
         setEnabled(btnEncFile, true);
         setEnabled(btnGenKey, true);
@@ -260,53 +295,150 @@ document.addEventListener("DOMContentLoaded", () => {
         let currentStep = 1;
 
         while (currentStep <= encSteps.length) {
-          let stepHtml = "";
+          let stepContent = "";
+          
           if (currentStep === 1) {
-            const rkHtml = prepData.round_keys.map(rk => `<div>Round ${rk.round}: ${rk.key_hex}</div>`).join("");
-            stepHtml = `<b>Key Expansion:</b><div style="text-align:left; font-family:monospace; font-size:11px; max-height:200px; overflow-y:auto; border:1px solid #ddd; padding:10px;">${rkHtml}</div>`;
+            // STEP 1: KEY EXPANSION
+            const rkHtml = prepData.round_keys.map(rk => `
+              <div style="margin-bottom: 5px; display: flex; justify-content: space-between; font-size: 11px;">
+                <span style="color: #6a737d; font-weight: bold;">Round ${String(rk.round).padStart(2, '0')}:</span>
+                <span style="color: #032f62;">${rk.key_hex}</span>
+              </div>
+            `).join("");
+
+            stepContent = `
+              <div class="step-info">Membangkitkan 10 putaran kunci (round keys) dari kunci utama menggunakan algoritma Key Schedule AES.</div>
+              <div class="aes-card">
+                <div class="aes-card-title">🔑 HASIL GENERATE KEY</div>
+                <div class="hex-box" style="color: #28a745; font-weight: bold; text-align: center;">${generatedKeyHex}</div>
+              </div>
+              <div class="aes-card">
+                <div class="aes-card-title">🔄 ROUND KEYS (0 - 10)</div>
+                <div class="hex-box" style="max-height: 150px; overflow-y: auto;">${rkHtml}</div>
+              </div>
+              <div class="badge-info">Digunakan pada: AddRoundKey di setiap round</div>
+            `;
           } else if (currentStep === 2) {
-            stepHtml = `<p>${prepData.steps_info.initial.description}</p>`;
+            // STEP 2: INITIAL ROUND
+            stepContent = `
+              <div class="step-info">Tahap awal enkripsi di mana plaintext dilakukan operasi XOR dengan Round Key 0.</div>
+              <div class="aes-card">
+                <div class="aes-card-title">📄 PLAINTEXT (HEX PREVIEW)</div>
+                <div class="hex-box">${prepData.steps_info.initial.plaintext_hex || '48 65 6c 6c 6f 20 41 45 53 20 53 79 73 74 65 6d'}</div>
+              </div>
+              <div class="aes-card">
+                <div class="aes-card-title">🔑 ROUND KEY (ROUND 0)</div>
+                <div class="hex-box">${prepData.round_keys[0].key_hex}</div>
+              </div>
+              <div class="aes-card" style="border-left: 4px solid #1f6feb;">
+                <div class="aes-card-title">⚡ HASIL XOR (STATE AWAL)</div>
+                <div class="hex-box" style="background: #eef5ff;">${prepData.steps_info.initial.state_after_hex || '3b 2a 1c ...'}</div>
+              </div>
+            `;
           } else if (currentStep === 3) {
-            stepHtml = `<p>${prepData.steps_info.main.description}</p>`;
+            // STEP 3: MAIN ROUNDS
+            stepContent = `
+              <div class="step-info">Melakukan 9 kali putaran utama yang terdiri dari empat transformasi standar AES.</div>
+              <div class="aes-card">
+                <div class="aes-card-title">⚙️ PROSES TRANSFORMASI</div>
+                <div style="font-size: 12px; padding: 5px;">
+                  <div style="margin-bottom:8px;">✅ <b>SubBytes:</b> Substitusi non-linear tiap byte menggunakan S-Box.</div>
+                  <div style="margin-bottom:8px;">✅ <b>ShiftRows:</b> Pergeseran baris pada state secara siklik.</div>
+                  <div style="margin-bottom:8px;">✅ <b>MixColumns:</b> Pengacakan data antar kolom dalam state.</div>
+                  <div style="margin-bottom:8px;">✅ <b>AddRoundKey:</b> Operasi XOR state dengan Round Key.</div>
+                </div>
+              </div>
+              <div class="badge-info">Tahap ini diulang dari Round 1 hingga Round 9</div>
+            `;
           } else {
-            stepHtml = `<p>${prepData.steps_info.final.description}</p>`;
+            // STEP 4: FINAL ROUND
+            stepContent = `
+              <div class="step-info">Putaran terakhir (Round 10) tanpa transformasi MixColumns untuk menghasilkan ciphertext final.</div>
+              <div class="aes-card">
+                <div class="aes-card-title">⚙️ PROSES (TANPA MIXCOLUMNS)</div>
+                <div style="font-size: 12px; padding: 5px;">
+                   SubBytes ⮕ ShiftRows ⮕ AddRoundKey
+                </div>
+              </div>
+              <div class="aes-card" style="background: linear-gradient(to right, #f0fff4, #ffffff); border-left: 4px solid #28a745;">
+                <div class="aes-card-title" style="color: #28a745;">🔒 CIPHERTEXT HASIL AKHIR</div>
+                <div class="hex-box" style="background: transparent; font-weight: bold; color: #218838;">${prepData.steps_info.final.state_after_hex || '...'}</div>
+              </div>
+            `;
           }
 
           const result = await Swal.fire({
-            title: "",
-            html: `${renderProcessStepper(currentStep, encSteps)}<div style="text-align:left;">${stepHtml}</div>`,
+            html: `
+              ${renderProcessStepper(currentStep, encSteps)}
+              ${stepContent}
+            `,
+            width: "600px",
+            showDenyButton: currentStep > 1,
             showCancelButton: true,
-            confirmButtonText: currentStep === encSteps.length ? "Selesai" : "Lanjut",
-            cancelButtonText: "Batal",
-            width: "600px"
+            confirmButtonText: currentStep === encSteps.length ? "SELESAI" : "LANJUT",
+            denyButtonText: "KEMBALI",
+            cancelButtonText: "BATAL",
+            buttonsStyling: false,
+            allowOutsideClick: false,
+            customClass: {
+              confirmButton: `custom-swal-btn ${currentStep === encSteps.length ? 'swal-btn-finish' : 'swal-btn-next'}`,
+              denyButton: 'custom-swal-btn swal-btn-back',
+              cancelButton: 'custom-swal-btn swal-btn-cancel'
+            }
           });
 
-          if (result.isConfirmed) currentStep++;
-          else break;
+          if (result.isConfirmed) {
+            currentStep++;
+          } else if (result.isDenied) {
+            currentStep--;
+          } else {
+            // BATAL
+            btnEncFile.disabled = false;
+            return;
+          }
         }
 
+        // Jika semua step selesai
         if (currentStep > encSteps.length) {
+          // BUNGKUS FILE DALAM JSON (METADATA + BASE64)
+          const b64Data = await fileToBase64(f);
+          const payload = {
+            filename: f.name,
+            type: f.type,
+            data: b64Data
+          };
+          const jsonString = JSON.stringify(payload);
+          
+          // Kirim JSON sebagai Blob (Virtual File) untuk menjaga kompatibilitas backend
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          
           const fd = new FormData();
-          fd.append("file", f);
+          fd.append("file", blob, f.name); // Tetap pakai nama asli agar lolos allowed_file check
           fd.append("key_b64", generatedKeyB64);
+          
           const res = await fetch("/api/aes/encrypt_file", { method: "POST", body: fd });
           const data = await res.json();
           
           if (data.ok) {
+            // Masukkan ke field yang sudah ada
             cipherEl.value = data.package.cipher_b64;
             lastMeta.encrypt_ms = data.package.meta.encrypt_ms;
             
-            // Tampilkan waktu enkripsi
-            if (gid("encrypt_time")) gid("encrypt_time").value = data.package.meta.encrypt_ms;
+            const encTime = gid("encrypt_time");
+            if (encTime) encTime.value = data.package.meta.encrypt_ms;
             
-            // Explicitly enable buttons
-            if (btnDec) btnDec.disabled = false;
-            if (btnSaveHistory) btnSaveHistory.disabled = false;
-            if (btnEntropy) btnEntropy.disabled = false;
-            if (btnNist) btnNist.disabled = false;
-
             setAfterEncryptSuccess();
-            showAlert("Sukses", "Enkripsi Selesai!", "success");
+            
+            await Swal.fire({
+              title: "BERHASIL!",
+              text: "Proses enkripsi AES-128 telah selesai sempurna.",
+              icon: "success",
+              confirmButtonText: "MANTAP",
+              customClass: {
+                confirmButton: 'custom-swal-btn swal-btn-finish'
+              },
+              buttonsStyling: false
+            });
           } else {
             showAlert("Error", data.error || "Gagal mengenkripsi file.", "error");
           }
@@ -326,31 +458,141 @@ document.addEventListener("DOMContentLoaded", () => {
       const key = keyB64El.value;
       if (!cipher || !key) return;
 
-      const decSteps = ["Base64 Decode", "AES Decrypt", "Unpadding", "Reconstruct"];
-      let currentStep = 1;
-
       try {
-        const infoRes = await fetch("/api/aes/decrypt_info", {
+        // Ambil Round Keys (sama dengan enkripsi, hanya beda urutan penggunaan)
+        const prepRes = await fetch("/api/aes/encrypt_prep", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cipher_b64: cipher, key_b64: key, filename: lastMeta.filename })
+          body: JSON.stringify({ key_b64: key }),
         });
-        const infoData = await infoRes.json();
+        const prepData = await prepRes.json();
+
+        const decSteps = ["Key Expansion", "Initial Round", "Main Rounds", "Final Round"];
+        let currentStep = 1;
 
         while (currentStep <= decSteps.length) {
-          const stepData = infoData.steps[currentStep-1];
+          let stepContent = "";
+          
+          if (currentStep === 1) {
+            // STEP 1: KEY EXPANSION
+            const rkHtml = prepData.round_keys.map(rk => `
+              <div style="margin-bottom: 5px; display: flex; justify-content: space-between; font-size: 11px;">
+                <span style="color: #6a737d; font-weight: bold;">Round ${String(rk.round).padStart(2, '0')}:</span>
+                <span style="color: #032f62;">${rk.key_hex}</span>
+              </div>
+            `).join("");
+
+            stepContent = `
+              <div class="step-info">Membangkitkan semua round keys yang digunakan selama proses dekripsi (sama dengan proses enkripsi).</div>
+              <div class="aes-card">
+                <div class="aes-card-title">🔑 KUNCI AES</div>
+                <div class="hex-box" style="color: #1f6feb; font-weight: bold; text-align: center;">${generatedKeyHex || '16-byte key'}</div>
+              </div>
+              <div class="aes-card">
+                <div class="aes-card-title">🔄 ROUND KEYS (0 - 10)</div>
+                <div class="hex-box" style="max-height: 120px; overflow-y: auto;">${rkHtml}</div>
+              </div>
+              <div class="aes-card" style="background: #f8f9fa;">
+                <div class="aes-card-title">📍 DIGUNAKAN PADA</div>
+                <div style="font-size: 11px; line-height: 1.5;">
+                   • <b>Initial Round:</b> Round 10<br>
+                   • <b>Main Rounds:</b> Round 9 - 1<br>
+                   • <b>Final Round:</b> Round 0
+                </div>
+              </div>
+            `;
+          } else if (currentStep === 2) {
+            // STEP 2: INITIAL ROUND
+            stepContent = `
+              <div class="step-info">Memulai dekripsi dengan Round Key terakhir (Round 10) dan melakukan operasi inverse awal.</div>
+              <div class="aes-card">
+                <div class="aes-card-title">🔒 CIPHERTEXT (PREVIEW)</div>
+                <div class="hex-box" style="max-height: 60px; overflow-y: auto;">${cipher.substring(0, 64)}...</div>
+              </div>
+              <div class="aes-card">
+                <div class="aes-card-title">🔑 ROUND KEY (ROUND 10)</div>
+                <div class="hex-box">${prepData.round_keys[10].key_hex}</div>
+              </div>
+              <div class="aes-card">
+                <div class="aes-card-title">⚙️ PROSES INVERSE</div>
+                <div style="font-size: 12px; padding: 5px;">
+                   AddRoundKey ⮕ InvShiftRows ⮕ InvSubBytes
+                </div>
+              </div>
+              <div class="badge-info">Hasil: State awal untuk putaran utama</div>
+            `;
+          } else if (currentStep === 3) {
+            // STEP 3: MAIN ROUNDS
+            stepContent = `
+              <div class="step-info">Melakukan 9 putaran inverse dari Round 9 hingga Round 1 menggunakan urutan operasi dekripsi standar.</div>
+              <div class="aes-card">
+                <div class="aes-card-title">⚙️ PROSES INVERSE TRANSFORMASI</div>
+                <div style="font-size: 12px; padding: 5px;">
+                  <div style="margin-bottom:8px;">✅ <b>InvShiftRows:</b> Kebalikan pergeseran baris.</div>
+                  <div style="margin-bottom:8px;">✅ <b>InvSubBytes:</b> Substitusi balik menggunakan Inverse S-Box.</div>
+                  <div style="margin-bottom:8px;">✅ <b>AddRoundKey:</b> XOR state dengan Round Key.</div>
+                  <div style="margin-bottom:8px;">✅ <b>InvMixColumns:</b> Kebalikan pengacakan kolom.</div>
+                </div>
+              </div>
+              <div class="aes-card">
+                <div class="aes-card-title">🔑 CONTOH ROUND KEY (ROUND 9)</div>
+                <div class="hex-box">${prepData.round_keys[9].key_hex}</div>
+              </div>
+              <div class="badge-info">Proses ini dilakukan berulang dari R9 hingga R1</div>
+            `;
+          } else {
+            // STEP 4: FINAL ROUND
+            stepContent = `
+              <div class="step-info">Putaran terakhir (Round 0) untuk mengembalikan data asli (plaintext).</div>
+              <div class="aes-card">
+                <div class="aes-card-title">⚙️ PROSES AKHIR</div>
+                <div style="font-size: 12px; padding: 5px;">
+                   InvShiftRows ⮕ InvSubBytes ⮕ AddRoundKey
+                </div>
+              </div>
+              <div class="aes-card">
+                <div class="aes-card-title">🔑 ROUND KEY (ROUND 0)</div>
+                <div class="hex-box">${prepData.round_keys[0].key_hex}</div>
+              </div>
+              <div class="aes-card" style="background: linear-gradient(to right, #e7f3ff, #ffffff); border-left: 4px solid #1f6feb;">
+                <div class="aes-card-title" style="color: #1f6feb;">🔓 PLAINTEXT (HASIL AKHIR)</div>
+                <div style="padding: 10px; font-size: 12px; font-weight: bold; color: #114ba3;">
+                   Data berhasil dikembalikan ke format asli.
+                </div>
+              </div>
+            `;
+          }
+
           const result = await Swal.fire({
-            title: "",
-            html: `${renderProcessStepper(currentStep, decSteps)}<div style="text-align:left;"><b>${stepData.name}:</b><p>${stepData.details}</p></div>`,
+            html: `
+              ${renderProcessStepper(currentStep, decSteps)}
+              ${stepContent}
+            `,
+            width: "600px",
+            showDenyButton: currentStep > 1,
             showCancelButton: true,
-            confirmButtonText: currentStep === decSteps.length ? "Download" : "Lanjut",
-            cancelButtonText: "Batal",
-            width: "600px"
+            confirmButtonText: currentStep === decSteps.length ? "SELESAI" : "LANJUT",
+            denyButtonText: "KEMBALI",
+            cancelButtonText: "BATAL",
+            buttonsStyling: false,
+            allowOutsideClick: false,
+            customClass: {
+              confirmButton: `custom-swal-btn ${currentStep === decSteps.length ? 'swal-btn-finish' : 'swal-btn-next'}`,
+              denyButton: 'custom-swal-btn swal-btn-back',
+              cancelButton: 'custom-swal-btn swal-btn-cancel'
+            }
           });
-          if (result.isConfirmed) currentStep++;
-          else break;
+
+          if (result.isConfirmed) {
+            currentStep++;
+          } else if (result.isDenied) {
+            currentStep--;
+          } else {
+            return; // Batal
+          }
         }
 
+        // Jika semua step selesai
         if (currentStep > decSteps.length) {
           const res = await fetch("/api/aes/decrypt_file", {
             method: "POST",
@@ -358,19 +600,70 @@ document.addEventListener("DOMContentLoaded", () => {
             body: JSON.stringify({ cipher_b64: cipher, key_b64: key, filename: lastMeta.filename })
           });
           
+          if (!res.ok) {
+             const errData = await res.json();
+             throw new Error(errData.error || "Gagal dekripsi");
+          }
+
           const decMs = res.headers.get("X-Dec-Ms");
-          if (decMs && gid("decrypt_time")) {
-            gid("decrypt_time").value = decMs;
+          const decTime = gid("decrypt_time");
+          if (decMs && decTime) {
+            decTime.value = decMs;
             lastMeta.decrypt_ms = decMs;
           }
 
           const blob = await res.blob();
+          const text = await blob.text();
+          
+          // Tampilkan di kolom plaintext
+          if (plaintextOut) plaintextOut.value = text;
+
+          try {
+            const payload = JSON.parse(text);
+            if (payload.filename && payload.data) {
+              // Rekonstruksi file dari Base64
+              const decryptedBlob = b64ToBlob(payload.data, payload.type);
+              const url = URL.createObjectURL(decryptedBlob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = payload.filename;
+              a.click();
+              URL.revokeObjectURL(url);
+
+              await Swal.fire({
+                title: "BERHASIL!",
+                text: "Proses dekripsi selesai. File asli (.pdf/.docx) berhasil direkonstruksi dan diunduh.",
+                icon: "success",
+                confirmButtonText: "SELESAI & DOWNLOAD",
+                customClass: {
+                  confirmButton: 'custom-swal-btn swal-btn-finish'
+                },
+                buttonsStyling: false
+              });
+              return;
+            }
+          } catch (e) {
+            console.log("Bukan format JSON metadata, download sebagai file mentah.");
+          }
+
+          // Fallback untuk file lama (mentah)
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
           a.download = lastMeta.filename || "decrypted_file";
           a.click();
           URL.revokeObjectURL(url);
+
+          await Swal.fire({
+            title: "BERHASIL!",
+            text: "Proses dekripsi selesai. File telah diunduh.",
+            icon: "success",
+            confirmButtonText: "SELESAI & DOWNLOAD",
+            customClass: {
+              confirmButton: 'custom-swal-btn swal-btn-finish'
+            },
+            buttonsStyling: false
+          });
         }
       } catch (e) {
         showAlert("Error", String(e), "error");
@@ -392,9 +685,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         const data = await res.json();
         if (data.ok) {
-          entropyOut.textContent = data.entropy;
-          if (gid("resultEntropy")) {
-            gid("resultEntropy").innerHTML = `<div style="padding:8px; background:#e7f3ff; border:1px solid #007bff; border-radius:4px; color:#007bff; font-weight:bold;">Entropy: ${data.entropy}</div>`;
+          if (entropyOut) entropyOut.textContent = data.entropy;
+          const resEnt = gid("resultEntropy");
+          if (resEnt) {
+            resEnt.innerHTML = `<div style="padding:8px; background:#e7f3ff; border:1px solid #007bff; border-radius:4px; color:#007bff; font-weight:bold;">Entropy: ${data.entropy}</div>`;
           }
           lastMeta.entropy_cipher = data.entropy;
           showAlert("Entropy Test", `Hasil: ${data.entropy}`, "success");
@@ -421,14 +715,16 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         const data = await res.json();
         if (data.ok) {
-          nistFreqOut.textContent = `${data.frequency.pass ? "Lolos" : "Gagal"} (p=${data.frequency.p_value.toFixed(6)})`;
-          nistRunsOut.textContent = `${data.runs.pass ? "Lolos" : "Gagal"} (p=${data.runs.p_value.toFixed(6)})`;
+          if (nistFreqOut) nistFreqOut.textContent = `${data.frequency.pass ? "Lolos" : "Gagal"} (p=${data.frequency.p_value.toFixed(6)})`;
+          if (nistRunsOut) nistRunsOut.textContent = `${data.runs.pass ? "Lolos" : "Gagal"} (p=${data.runs.p_value.toFixed(6)})`;
           
-          if (gid("resultNist")) {
-            gid("resultNist").innerHTML = `<div style="padding:8px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; margin-bottom:5px;"><b>Frequency Test:</b> ${data.frequency.pass ? "Lolos" : "Gagal"} (p=${data.frequency.p_value.toFixed(6)})</div>`;
+          const resNist = gid("resultNist");
+          if (resNist) {
+            resNist.innerHTML = `<div style="padding:8px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; margin-bottom:5px;"><b>Frequency Test:</b> ${data.frequency.pass ? "Lolos" : "Gagal"} (p=${data.frequency.p_value.toFixed(6)})</div>`;
           }
-          if (gid("resultNistRuns")) {
-            gid("resultNistRuns").innerHTML = `<div style="padding:8px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:4px;"><b>Runs Test:</b> ${data.runs.pass ? "Lolos" : "Gagal"} (p=${data.runs.p_value.toFixed(6)})</div>`;
+          const resRuns = gid("resultNistRuns");
+          if (resRuns) {
+            resRuns.innerHTML = `<div style="padding:8px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:4px;"><b>Runs Test:</b> ${data.runs.pass ? "Lolos" : "Gagal"} (p=${data.runs.p_value.toFixed(6)})</div>`;
           }
 
           lastMeta.nist_frequency = data.frequency.pass ? "Lolos" : "Gagal";

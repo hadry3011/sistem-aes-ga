@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />
@@ -10,7 +10,7 @@
 </head>
 <body>
   <div class="container">
-    <div class= "title-aes">
+    <div class="title-aes">
       <h1>AES Baseline</h1>
     </div>
 
@@ -43,30 +43,62 @@
       <!-- Output Package -->
       <h3>Output Package</h3>
       <div class="grid">
-        <div>
+        <!-- Kolom 1: Ciphertext -->
+        <div class="output-card">
+          <div class="card-header">
+            <span class="icon">🔒</span>
+            <span class="title">Data Terenkripsi</span>
+          </div>
           <label for="cipher_b64">Cipher Text</label>
           <textarea id="cipher_b64" rows="6" placeholder="Hasil cipher akan muncul di sini"></textarea>
         </div>
 
-        <div>
-          <label for="key_b64">Key AES </label>
-          <textarea id="key_b64" rows="2" placeholder="Hasil kunci AES akan muncul di sini"></textarea>
+        <!-- Kolom 2: Plaintext -->
+        <div class="output-card">
+          <div class="card-header">
+            <span class="icon">🔓</span>
+            <span class="title">Hasil Dekripsi</span>
+          </div>
+          <label for="plaintext_out">Plaintext (Hasil Dekripsi)</label>
+          <textarea id="plaintext_out" rows="6" placeholder="Hasil dekripsi (JSON) akan muncul di sini" readonly></textarea>
+        </div>
 
-          <label for="key_hex" style="margin-top: 12px;">Key AES (Hex)</label>
-          <textarea id="key_hex" rows="2" placeholder="Hasil kunci AES (Hex) akan muncul di sini"></textarea>
+        <!-- Kolom 3: Key Information -->
+        <div class="output-card">
+          <div class="card-header">
+            <span class="icon">🔑</span>
+            <span class="title">Detail Kunci AES</span>
+          </div>
+          <label for="key_b64">Key AES (Base64)</label>
+          <textarea id="key_b64" rows="2" placeholder="Kunci AES Base64"></textarea>
 
-          <label for="key_info" style="margin-top: 12px;">Informasi Key</label>
+          <label for="key_hex" style="margin-top: 12px; display: block;">Key AES (Hex)</label>
+          <textarea id="key_hex" rows="2" placeholder="Kunci AES Hex"></textarea>
+
+          <label for="key_info" style="margin-top: 12px; display: block;">Informasi Key</label>
           <input id="key_info" type="text" value="16 byte / 128 bit" readonly />
         </div>
 
-        <div>
-          <label for="encrypt_time">Waktu Enkripsi (ms)</label>
-          <input id="encrypt_time" type="text" readonly />
-        </div>
-
-        <div>
-          <label for="decrypt_time">Waktu Dekripsi (ms)</label>
-          <input id="decrypt_time" type="text" readonly />
+        <!-- Kolom 4: Statistik Waktu -->
+        <div class="output-card timing-card">
+          <div class="card-header">
+            <span class="icon">⏱️</span>
+            <span class="title">Statistik Waktu</span>
+          </div>
+          <div class="timing-item">
+            <label for="encrypt_time">Waktu Enkripsi</label>
+            <div class="input-group">
+              <input id="encrypt_time" type="text" readonly placeholder="0" />
+              <span class="unit">ms</span>
+            </div>
+          </div>
+          <div class="timing-item">
+            <label for="decrypt_time">Waktu Dekripsi</label>
+            <div class="input-group">
+              <input id="decrypt_time" type="text" readonly placeholder="0" />
+              <span class="unit">ms</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -76,57 +108,18 @@
       <h2>Pengujian Ciphertext</h2>
       <div class="grid">
         <div>
-          <!-- Tombol untuk Entropy Test dan hasilnya langsung di bawah tombol -->
           <button id="btnEntropy" class="menu-button">Entropy Test</button>
-          <div id="resultEntropy" class="test-result"></div> <!-- Hasil test langsung di bawah tombol -->
+          <div id="resultEntropy" class="test-result"></div>
 
-          <!-- Tombol untuk Run NIST Test dan hasilnya langsung di bawah tombol -->
           <button id="btnNist" class="menu-button">Run NIST Test</button>
-          <div id="resultNist" class="test-result"></div> <!-- Hasil test langsung di bawah tombol -->
-          <div id="resultNistBlockFreq" class="test-result"></div> <!-- Block Frequency Test -->
-          <div id="resultNistRuns" class="test-result"></div> <!-- Hasil test langsung di bawah tombol -->
+          <div id="resultNist" class="test-result"></div>
+          <div id="resultNistBlockFreq" class="test-result"></div>
+          <div id="resultNistRuns" class="test-result"></div>
         </div>
         <div>
           <button id="btnDec" class="menu-button">Dekrip & Download</button>
           <button id="btnSaveHistory" class="menu-button">Save History (XLSX)</button>
         </div>
-      </div>
-
-      <!-- PROSES DEKRIPSI -->
-      <div id="decryptProcess" style="display:none; margin-top: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;">
-        <h3 style="margin-top: 0;">📋 Proses Dekripsi</h3>
-        
-        <!-- Ciphertext Preview -->
-        <div style="margin-bottom: 15px;">
-          <label style="font-weight: bold;">Ciphertext (Base64 Preview):</label>
-          <div id="cipherPreview" style="background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 3px; font-family: monospace; font-size: 11px; word-break: break-all; max-height: 60px; overflow-y: auto;"></div>
-        </div>
-
-        <!-- Step-by-Step Status -->
-        <div id="decryptSteps" style="margin-bottom: 15px;"></div>
-
-        <!-- File Info -->
-        <div id="fileInfo" style="display:none; background: #d4edda; padding: 15px; border: 1px solid #c3e6cb; border-radius: 3px; margin-bottom: 15px;">
-          <h4 style="margin-top: 0; color: #155724;">✅ Informasi File</h4>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div><b>Tipe File:</b> <span id="fileType">-</span></div>
-            <div><b>Ukuran:</b> <span id="fileSize">-</span></div>
-            <div><b>Filename:</b> <span id="fileDecryptedName">-</span></div>
-            <div><b>Waktu Dekripsi:</b> <span id="fileDecTime">-</span></div>
-          </div>
-        </div>
-
-        <!-- Download Button -->
-        <div id="downloadSection" style="display:none; text-align: center;">
-          <button id="btnDownload" class="menu-button" style="background: #28a745; color: white; padding: 12px 30px; font-size: 16px;">⬇️ Download File Dekripsi</button>
-        </div>
-      </div>
-
-      <!-- Hasil dari perhitungan Entropy dan NIST -->
-        <div class="file-info">
-       <!-- <div><b>Entropy (cipher):</b> <span id="entropyOut">-</span></div>
-        <div><b>NIST Frequency:</b> <span id="nistFreqOut">-</span></div>
-        <div><b>NIST Runs:</b> <span id="nistRunsOut">-</span></div>-->
       </div>
 
       <hr>
@@ -140,6 +133,5 @@
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.all.min.js"></script>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-
 </body>
 </html>

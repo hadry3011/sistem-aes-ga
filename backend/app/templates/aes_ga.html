@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />
@@ -11,8 +11,8 @@
 
 <body>
   <div class="container">
-    <div class= "title-aes+GA">
-      <h1>AES+GA</h1>
+    <div class="title-aes">
+      <h1>AES + Genetic Algorithm</h1>
     </div>
 
     <div class="card">
@@ -75,51 +75,90 @@
       </div>
 
       <!-- Info GA -->
-      <div id="gaResult" style="display:none; margin-top: 10px;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <div>
-            <label for="ga_key">Key GA (Base64)</label>
-            <textarea id="ga_key" rows="2" readonly></textarea>
+      <div id="gaResult" style="display:none; margin-top: 20px;">
+        <div class="output-card">
+          <div class="card-header">
+            <span class="icon">🧬</span>
+            <span class="title">Detail Optimasi GA</span>
           </div>
-          <div>
-            <label for="ga_key_hex">Key GA (Hexadecimal - 16 Byte)</label>
-            <textarea id="ga_key_hex" rows="2" readonly></textarea>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <label for="ga_key_b64_display">Key Hasil GA (Base64)</label>
+              <textarea id="ga_key_b64_display" rows="2" readonly placeholder="Kunci hasil optimasi GA"></textarea>
+            </div>
+            <div>
+              <label for="ga_key_hex_display">Key Hasil GA (Hex)</label>
+              <textarea id="ga_key_hex_display" rows="2" readonly placeholder="Kunci hasil optimasi GA (Hex)"></textarea>
+            </div>
           </div>
-        </div>
-        <div style="margin-top: 10px;">
-          <label for="ga_info">Informasi GA</label>
-          <textarea id="ga_info" rows="2" readonly style="width: 100%;"></textarea>
+          <div style="margin-top: 10px;">
+            <label for="ga_info">Statistik Evolusi GA</label>
+            <textarea id="ga_info" rows="3" readonly style="width: 100%;"></textarea>
+          </div>
         </div>
       </div>
 
       <hr>
 
+      <!-- Output Package -->
       <h3>Output Package</h3>
       <div class="grid">
-        <div>
+        <!-- Kolom 1: Ciphertext -->
+        <div class="output-card">
+          <div class="card-header">
+            <span class="icon">🔒</span>
+            <span class="title">Data Terenkripsi</span>
+          </div>
           <label for="cipher_b64">Cipher Text</label>
-          <textarea id="cipher_b64" rows="8" readonly></textarea>
+          <textarea id="cipher_b64" rows="6" placeholder="Hasil cipher akan muncul di sini"></textarea>
         </div>
-        <div>
-          <div style="margin-bottom: 10px;">
-            <label for="key">Key AES (Base64)</label>
-            <textarea id="key" rows="2" readonly></textarea>
-          </div>
-          <div>
-            <label for="key_hex">Key AES (Hex)</label>
-            <textarea id="key_hex" rows="2" readonly></textarea>
-          </div>
-        </div>
-      </div>
 
-      <div class="grid" style="margin-top: 10px;">
-        <div>
-          <label for="encms">Waktu Enkripsi (ms)</label>
-          <textarea id="encms" rows="1" readonly></textarea>
+        <!-- Kolom 2: Plaintext -->
+        <div class="output-card">
+          <div class="card-header">
+            <span class="icon">🔓</span>
+            <span class="title">Hasil Dekripsi</span>
+          </div>
+          <label for="plaintext_out">Plaintext (Hasil Dekripsi)</label>
+          <textarea id="plaintext_out" rows="6" placeholder="Hasil dekripsi (JSON) akan muncul di sini" readonly></textarea>
         </div>
-        <div>
-          <label for="decms">Waktu Dekripsi (ms)</label>
-          <textarea id="decms" rows="1" readonly></textarea>
+
+        <!-- Kolom 3: Key Information -->
+        <div class="output-card">
+          <div class="card-header">
+            <span class="icon">🔑</span>
+            <span class="title">Detail Kunci AES</span>
+          </div>
+          <label for="key_b64">Key AES (Base64)</label>
+          <textarea id="key_b64" rows="2" placeholder="Kunci AES Base64"></textarea>
+
+          <label for="key_hex" style="margin-top: 12px; display: block;">Key AES (Hex)</label>
+          <textarea id="key_hex" rows="2" placeholder="Kunci AES Hex"></textarea>
+
+          <label for="key_info" style="margin-top: 12px; display: block;">Informasi Key</label>
+          <input id="key_info" type="text" value="16 byte / 128 bit" readonly />
+        </div>
+
+        <!-- Kolom 4: Statistik Waktu -->
+        <div class="output-card timing-card">
+          <div class="card-header">
+            <span class="icon">⏱️</span>
+            <span class="title">Statistik Waktu</span>
+          </div>
+          <div class="timing-item">
+            <label for="encrypt_time">Waktu Enkripsi</label>
+            <div class="input-group">
+              <input id="encrypt_time" type="text" readonly placeholder="0" />
+              <span class="unit">ms</span>
+            </div>
+          </div>
+          <div class="timing-item">
+            <label for="decrypt_time">Waktu Dekripsi</label>
+            <div class="input-group">
+              <input id="decrypt_time" type="text" readonly placeholder="0" />
+              <span class="unit">ms</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -157,6 +196,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.all.min.js"></script>
-  <script src="{{ url_for('static', filename='js/app_ga.js') }}?v=6"></script>
+  <script src="{{ url_for('static', filename='js/app_ga.js') }}?v=7"></script>
 </body>
 </html>
