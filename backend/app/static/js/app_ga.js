@@ -134,6 +134,30 @@ function renderKeysPreview(keys) {
   `).join("");
 }
 
+function renderInitialPopulationTable(keys) {
+  if (!Array.isArray(keys) || !keys.length) return "Data tidak tersedia.";
+  return `
+    <div style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; background: #fff; margin-top:10px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+        <thead style="position: sticky; top: 0; background: #1f6feb; color: white; z-index: 1;">
+          <tr>
+            <th style="padding: 6px; border: 1px solid #ddd; width: 40px; text-align: center;">No</th>
+            <th style="padding: 6px; border: 1px solid #ddd;">Kromosom (Kunci Hex)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${keys.map(k => `
+            <tr>
+              <td style="padding: 4px; border: 1px solid #ddd; text-align: center;">${k.rank}</td>
+              <td style="padding: 4px; border: 1px solid #ddd; font-family: monospace;">${esc(k.key_hex)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function renderAllCandidatesTable(candidates) {
   if (!Array.isArray(candidates) || !candidates.length) return "Data tidak tersedia.";
   return `
@@ -186,27 +210,83 @@ function renderSelectionTables(selected) {
   `;
 }
 
+function formatToBlocksSimple(hexSpaced) {
+  if (!hexSpaced) return "";
+  return hexSpaced.split(' ').map(b => `[${b}]`).join(' ');
+}
+
+function getCrossoverVisualization(hex, pts) {
+  const bytes = hex.split(' ');
+  let line1 = "";
+  let arrowLine = "";
+  for (let i = 0; i <= 16; i++) {
+    if (pts.includes(i)) {
+      line1 += "| ";
+      arrowLine += "↑ ";
+    }
+    if (i < 16) {
+      line1 += `[${bytes[i]}] `;
+      arrowLine += "     ";
+    }
+  }
+  return { line1, arrowLine };
+}
+
 function renderCrossoverPairs(pairs) {
   if (!Array.isArray(pairs) || !pairs.length) return "Data tidak tersedia.";
-  return pairs.map((p, i) => `
-    <div style="margin-bottom: 10px; padding: 10px; background: #fff; border: 1px solid #eee; border-radius: 4px; font-family: monospace; font-size: 10px;">
-      <b>Pasangan ${i + 1}</b> (Point: ${p.point_byte})<br>
-      P1: ${p.parent1_hex}<br>
-      P2: ${p.parent2_hex}<br>
-      ⮕: ${p.child_hex}
-    </div>
-  `).join("");
+  return pairs.map((p, i) => {
+    const pts = p.point_byte === "none" ? [] : String(p.point_byte).split('&').map(Number);
+    const viz1 = getCrossoverVisualization(p.parent1_hex, pts);
+    const viz2 = getCrossoverVisualization(p.parent2_hex, pts);
+    
+    const labels = pts.map(pt => `Byte ke-${pt}`).join(", ");
+    const labelText = pts.length > 0 ? `Titik Crossover (${labels})` : "Tanpa Crossover";
+
+    return `
+      <div style="margin-bottom: 20px; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; overflow-x: auto;">
+<b style="color: #1f6feb;">Pasangan ${i + 1}</b>
+
+P1: ${viz1.line1}
+P2: ${viz2.line1}
+    ${viz1.arrowLine}
+    ${labelText}
+
+<b style="color: #28a745;">Hasil:</b>
+${formatToBlocksSimple(p.child_hex)}
+      </div>
+    `;
+  }).join("");
 }
 
 function renderMutationPairs(pairs) {
   if (!Array.isArray(pairs) || !pairs.length) return "Data tidak tersedia.";
-  return pairs.map((m, i) => `
-    <div style="margin-bottom: 10px; padding: 10px; background: #fff; border: 1px solid #eee; border-radius: 4px; font-family: monospace; font-size: 10px;">
-      <b>Individu ${i + 1}</b><br>
-      Sebelum: ${m.before_hex}<br>
-      Sesudah: ${m.after_hex}
-    </div>
-  `).join("");
+  return pairs.map((m, i) => {
+    const pts = m.mutation_points || [];
+    const before = formatToBlocksSimple(m.before_hex);
+    const after = formatToBlocksSimple(m.after_hex);
+    
+    let arrowLine = "";
+    for (let idx = 0; idx < 16; idx++) {
+      arrowLine += pts.includes(idx) ? "  ↑  " : "     ";
+    }
+    
+    const labels = pts.map(pt => `Byte ke-${pt + 1}`).join(", ");
+    const labelText = pts.length > 0 ? `Titik Mutasi (${labels})` : "Tidak ada mutasi";
+
+    return `
+      <div style="margin-bottom: 20px; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; overflow-x: auto;">
+<b style="color: #1f6feb;">Kandidat ${i + 1}</b>
+
+<b>Sebelum:</b>
+${before}
+${arrowLine}
+${labelText}
+
+<b>Sesudah:</b>
+${after}
+      </div>
+    `;
+  }).join("");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -298,9 +378,15 @@ document.addEventListener("DOMContentLoaded", () => {
           let showSkip = false;
 
           if (step === 1) {
-            title = "Langkah 1 — Inisialisasi";
+            title = "Langkah 1 — Inisialisasi Populasi";
             const s = trace.find(t => t.step === 1);
-            content = `${renderGAEvolutionStepper('init', 0, 0)}<div style="text-align:left"><b>Populasi Awal:</b> ${s?.population_size} kandidat<br>${renderKeysPreview(s?.keys_preview)}</div>`;
+            content = `
+              ${renderGAEvolutionStepper('init', 0, 0)}
+              <div style="text-align:left">
+                <div style="font-weight:bold; color:#d97706; margin-bottom:5px;">[!] Membangkitkan Populasi Awal: ${s?.population_size} kandidat ditemukan.</div>
+                <b>Daftar Kromosom:</b>
+                ${renderInitialPopulationTable(s?.keys_preview)}
+              </div>`;
           } else if (step === 2) {
             title = "Langkah 2 — Evaluasi Fitness";
             const s = trace.find(t => t.step === 2);
@@ -308,7 +394,13 @@ document.addEventListener("DOMContentLoaded", () => {
           } else if (step === 3) {
             title = "Langkah 3 — Seleksi Parent";
             const s = trace.find(t => t.step === 3);
-            content = `${renderGAEvolutionStepper('select', 0, 0)}<div style="text-align:left"><b>Parent Terpilih:</b><br>${renderSelectionTables(s?.selected_parents)}</div>`;
+            content = `
+              ${renderGAEvolutionStepper('select', 0, 0)}
+              <div style="text-align:left">
+                <div style="font-weight:bold; color:#16a34a; margin-bottom:5px;">[!] Seleksi Parent: Terpilih ${s?.selected_parents_count || 0} individu (50% populasi) dengan fitness tertinggi.</div>
+                <b>Parent Terpilih:</b><br>
+                ${renderSelectionTables(s?.selected_parents)}
+              </div>`;
           } else if (step === 4) {
             title = "Langkah 4 — Crossover";
             const s = trace.find(t => t.step === 4);

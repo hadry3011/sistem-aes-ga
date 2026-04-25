@@ -148,8 +148,8 @@ def ga_generate_key_hex(
                 no_improve += 1
 
             # 2. SELEKSI (Berdasarkan fitness tertinggi)
-            # Ambil 50% populasi (maks 30) untuk menjadi parent
-            num_selected = min(population // 2, 30)
+            # Ambil 50% populasi untuk menjadi parent
+            num_selected = population // 2
             if num_selected % 2 != 0: num_selected -= 1 # Pastikan genap untuk crossover
             if num_selected < 2: num_selected = 2
             
@@ -164,10 +164,11 @@ def ga_generate_key_hex(
                 })
                 
                 s_step = 3 if gen == 0 else 6
-                # REVISI: Hanya menampilkan fitness tertinggi (Top 10 saja agar rapi)
+                # Tampilkan SEMUA parent terpilih (50% populasi)
                 full_trace.append({
                     "step": s_step, "sub_step": "select", "gen": gen_num, "step_name": f"Seleksi Parent Gen {gen_num}",
-                    "selected_parents": [{"rank": i+1, "fitness": f, "key_hex": _format_key_spaced(k)} for i, (f, k) in enumerate(selected_parents[:10])]
+                    "selected_parents_count": len(selected_parents),
+                    "selected_parents": [{"rank": i+1, "fitness": f, "key_hex": _format_key_spaced(k)} for i, (f, k) in enumerate(selected_parents)]
                 })
 
             # 3. CROSSOVER (Berdasarkan hasil seleksi)
