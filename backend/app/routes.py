@@ -94,6 +94,7 @@ def aes_generate_key():
 def aes_encrypt_prep():
     data = request.get_json(silent=True) or {}
     key_b64 = data.get("key_b64", "").strip()
+    sample_hex = data.get("sample_hex", "").strip()
 
     if not key_b64:
         return jsonify(ok=False, error="key_b64 tidak ditemukan"), 400
@@ -101,6 +102,26 @@ def aes_encrypt_prep():
     try:
         key_bytes = base64.b64decode(key_b64)
         round_keys = aes_engine.aes_key_expansion(key_bytes)
+        
+        # Default fallback if no sample provided
+        if not sample_hex:
+            sample_hex = "48656c6c6f204145532053797374656d"
+            
+        # Clean hex string and convert to bytes
+        try:
+            p_bytes = bytes.fromhex(sample_hex.replace(" ", ""))
+        except:
+            p_bytes = b"\x00" * 16
+            
+        if len(p_bytes) > 16: p_bytes = p_bytes[:16]
+        if len(p_bytes) < 16: p_bytes = p_bytes.ljust(16, b"\x00")
+        
+        # XOR (Initial Round: AddRoundKey)
+        rk0_bytes = bytes.fromhex(round_keys[0])
+        state_after = bytes(p ^ k for p, k in zip(p_bytes, rk0_bytes))
+        
+        state_after_hex = " ".join(f"{b:02x}" for b in state_after).upper()
+        formatted_plaintext = " ".join(f"{b:02x}" for b in p_bytes).upper()
 
         return jsonify(
             ok=True,
@@ -111,7 +132,9 @@ def aes_encrypt_prep():
                 "initial": {
                     "name": "Initial Round (Round 0)",
                     "operation": "AddRoundKey",
-                    "description": "Plaintext dikombinasikan dengan Round Key 0 (kunci awal)."
+                    "description": "Plaintext dikombinasikan dengan Round Key 0 (kunci awal).",
+                    "plaintext_hex": formatted_plaintext,
+                    "state_after_hex": state_after_hex
                 },
                 "main": {
                     "name": "Main Rounds (Round 1-9)",
@@ -739,6 +762,7 @@ def aesga_encrypt_prep():
     """
     data = request.get_json(silent=True) or {}
     key_b64 = data.get("key_b64", "").strip()
+    sample_hex = data.get("sample_hex", "").strip()
 
     if not key_b64:
         return jsonify(ok=False, error="key_b64 tidak ditemukan"), 400
@@ -746,6 +770,26 @@ def aesga_encrypt_prep():
     try:
         key_bytes = base64.b64decode(key_b64)
         round_keys = aes_engine.aes_key_expansion(key_bytes)
+        
+        # Default fallback if no sample provided
+        if not sample_hex:
+            sample_hex = "48656c6c6f204145532053797374656d"
+            
+        # Clean hex string and convert to bytes
+        try:
+            p_bytes = bytes.fromhex(sample_hex.replace(" ", ""))
+        except:
+            p_bytes = b"\x00" * 16
+            
+        if len(p_bytes) > 16: p_bytes = p_bytes[:16]
+        if len(p_bytes) < 16: p_bytes = p_bytes.ljust(16, b"\x00")
+        
+        # XOR (Initial Round: AddRoundKey) menggunakan Round Key 0
+        rk0_bytes = bytes.fromhex(round_keys[0])
+        state_after = bytes(p ^ k for p, k in zip(p_bytes, rk0_bytes))
+        
+        state_after_hex = " ".join(f"{b:02x}" for b in state_after).upper()
+        formatted_plaintext = " ".join(f"{b:02x}" for b in p_bytes).upper()
 
         return jsonify(
             ok=True,
@@ -756,7 +800,9 @@ def aesga_encrypt_prep():
                 "initial": {
                     "name": "Initial Round (Round 0)",
                     "operation": "AddRoundKey",
-                    "description": "Plaintext dikombinasikan dengan Round Key 0 (hasil optimasi GA)."
+                    "description": "Plaintext dikombinasikan dengan Round Key 0 (hasil optimasi GA).",
+                    "plaintext_hex": formatted_plaintext,
+                    "state_after_hex": state_after_hex
                 },
                 "main": {
                     "name": "Main Rounds (Round 1-9)",

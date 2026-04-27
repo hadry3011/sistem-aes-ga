@@ -9,10 +9,11 @@ function formatKB(bytes) {
  * Render progress indicator bar untuk proses enkripsi/dekripsi
  * @param {number} currentStep - Step saat ini (1-N)
  * @param {Array} stepNames - Nama-nama step
+ * @param {boolean} isDecryption - Flag jika ini adalah proses dekripsi
  * @returns {string} HTML string untuk stepper
  */
-function renderProcessStepper(currentStep, stepNames) {
-  const isEncryption = stepNames.includes("Key Expansion") || stepNames.includes("Initial Round");
+function renderProcessStepper(currentStep, stepNames, isDecryption = false) {
+  const isEncryption = !isDecryption && (stepNames.includes("Key Expansion") || stepNames.includes("Initial Round"));
   const title = isEncryption ? "PROSES ENKRIPSI" : "PROSES DEKRIPSI";
   
   let html = `
@@ -284,10 +285,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
       try {
         btnEncFile.disabled = true;
+
+        // BACA 16 BYTE PERTAMA FILE UNTUK VISUALISASI DATA ASLI
+        const readSample = () => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            const blob = f.slice(0, 16);
+            reader.onload = (e) => {
+              const buffer = e.target.result;
+              const uint8 = new Uint8Array(buffer);
+              let hex = "";
+              for (let b of uint8) hex += b.toString(16).padStart(2, '0');
+              resolve(hex);
+            };
+            reader.readAsArrayBuffer(blob);
+          });
+        };
+        const sampleHex = await readSample();
+
         const prepRes = await fetch("/api/aes/encrypt_prep", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key_b64: generatedKeyB64 }),
+          body: JSON.stringify({ 
+            key_b64: generatedKeyB64,
+            sample_hex: sampleHex 
+          }),
         });
         const prepData = await prepRes.json();
         
@@ -307,7 +329,9 @@ document.addEventListener("DOMContentLoaded", () => {
             `).join("");
 
             stepContent = `
+              <!--
               <div class="step-info">Membangkitkan 10 putaran kunci (round keys) dari kunci utama menggunakan algoritma Key Schedule AES.</div>
+              -->
               <div class="aes-card">
                 <div class="aes-card-title">🔑 HASIL GENERATE KEY</div>
                 <div class="hex-box" style="color: #28a745; font-weight: bold; text-align: center;">${generatedKeyHex}</div>
@@ -316,7 +340,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="aes-card-title">🔄 ROUND KEYS (0 - 10)</div>
                 <div class="hex-box" style="max-height: 150px; overflow-y: auto;">${rkHtml}</div>
               </div>
+              <!--
               <div class="badge-info">Digunakan pada: AddRoundKey di setiap round</div>
+              -->
             `;
           } else if (currentStep === 2) {
             // STEP 2: INITIAL ROUND
@@ -324,7 +350,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="step-info">Tahap awal enkripsi di mana plaintext dilakukan operasi XOR dengan Round Key 0.</div>
               <div class="aes-card">
                 <div class="aes-card-title">📄 PLAINTEXT (HEX PREVIEW)</div>
-                <div class="hex-box">${prepData.steps_info.initial.plaintext_hex || '48 65 6c 6c 6f 20 41 45 53 20 53 79 73 74 65 6d'}</div>
+                <div class="hex-box">${prepData.steps_info.initial.plaintext_hex}</div>
               </div>
               <div class="aes-card">
                 <div class="aes-card-title">🔑 ROUND KEY (ROUND 0)</div>
@@ -332,7 +358,7 @@ document.addEventListener("DOMContentLoaded", () => {
               </div>
               <div class="aes-card" style="border-left: 4px solid #1f6feb;">
                 <div class="aes-card-title">⚡ HASIL XOR (STATE AWAL)</div>
-                <div class="hex-box" style="background: #eef5ff;">${prepData.steps_info.initial.state_after_hex || '3b 2a 1c ...'}</div>
+                <div class="hex-box" style="background: #eef5ff;">${prepData.steps_info.initial.state_after_hex}</div>
               </div>
             `;
           } else if (currentStep === 3) {
@@ -433,7 +459,7 @@ document.addEventListener("DOMContentLoaded", () => {
               title: "BERHASIL!",
               text: "Proses enkripsi AES-128 telah selesai sempurna.",
               icon: "success",
-              confirmButtonText: "MANTAP",
+              confirmButtonText: "SELESAI",
               customClass: {
                 confirmButton: 'custom-swal-btn swal-btn-finish'
               },
@@ -483,7 +509,9 @@ document.addEventListener("DOMContentLoaded", () => {
             `).join("");
 
             stepContent = `
+              <!--
               <div class="step-info">Membangkitkan semua round keys yang digunakan selama proses dekripsi (sama dengan proses enkripsi).</div>
+              -->
               <div class="aes-card">
                 <div class="aes-card-title">🔑 KUNCI AES</div>
                 <div class="hex-box" style="color: #1f6feb; font-weight: bold; text-align: center;">${generatedKeyHex || '16-byte key'}</div>
@@ -534,11 +562,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   <div style="margin-bottom:8px;">✅ <b>InvMixColumns:</b> Kebalikan pengacakan kolom.</div>
                 </div>
               </div>
-              <div class="aes-card">
-                <div class="aes-card-title">🔑 CONTOH ROUND KEY (ROUND 9)</div>
-                <div class="hex-box">${prepData.round_keys[9].key_hex}</div>
-              </div>
-              <div class="badge-info">Proses ini dilakukan berulang dari R9 hingga R1</div>
+              <div class="badge-info">Proses ini dilakukan berulang dari Round 9 hingga Round 1</div>
             `;
           } else {
             // STEP 4: FINAL ROUND
@@ -565,7 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const result = await Swal.fire({
             html: `
-              ${renderProcessStepper(currentStep, decSteps)}
+              ${renderProcessStepper(currentStep, decSteps, true)}
               ${stepContent}
             `,
             width: "600px",

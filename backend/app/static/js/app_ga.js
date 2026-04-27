@@ -6,10 +6,11 @@ if (typeof gid === 'undefined') {
  * Render progress indicator bar untuk proses enkripsi/dekripsi
  * @param {number} currentStep - Step saat ini (1-N)
  * @param {Array} stepNames - Nama-nama step
+ * @param {boolean} isDecryption - Flag jika ini adalah proses dekripsi
  * @returns {string} HTML string untuk stepper
  */
-function renderProcessStepper(currentStep, stepNames) {
-  const isEncryption = stepNames.includes("Key Expansion") || stepNames.includes("Initial Round");
+function renderProcessStepper(currentStep, stepNames, isDecryption = false) {
+  const isEncryption = !isDecryption && (stepNames.includes("Key Expansion") || stepNames.includes("Initial Round"));
   const title = isEncryption ? "PROSES ENKRIPSI (AES+GA)" : "PROSES DEKRIPSI (AES+GA)";
   
   let html = `
@@ -454,7 +455,32 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!f || !gaKeyB64) return;
       try {
         setEnabled(btnEncFile, false);
-        const prepRes = await fetch("/api/aesga/encrypt_prep", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key_b64: gaKeyB64 }) });
+
+        // BACA 16 BYTE PERTAMA FILE UNTUK VISUALISASI DATA ASLI
+        const readSample = () => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            const blob = f.slice(0, 16);
+            reader.onload = (e) => {
+              const buffer = e.target.result;
+              const uint8 = new Uint8Array(buffer);
+              let hex = "";
+              for (let b of uint8) hex += b.toString(16).padStart(2, '0');
+              resolve(hex);
+            };
+            reader.readAsArrayBuffer(blob);
+          });
+        };
+        const sampleHex = await readSample();
+
+        const prepRes = await fetch("/api/aesga/encrypt_prep", { 
+          method: "POST", 
+          headers: { "Content-Type": "application/json" }, 
+          body: JSON.stringify({ 
+            key_b64: gaKeyB64,
+            sample_hex: sampleHex
+          }) 
+        });
         const prepData = await prepRes.json();
         const steps = ["Key Expansion", "Initial Round", "Main Rounds", "Final Round"];
         let step = 1;
@@ -465,7 +491,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const rks = prepData.round_keys.map(rk => `<div style="display:flex; justify-content:space-between; font-size:11px;"><span>Round ${rk.round}:</span><span style="color:#032f62;">${rk.key_hex}</span></div>`).join("");
             html = `<div class="step-info">Membangkitkan round keys dari kunci hasil optimasi GA.</div><div class="aes-card"><div class="aes-card-title">🔑 KUNCI GA</div><div class="hex-box">${gaKeyHex}</div></div><div class="aes-card"><div class="aes-card-title">🔄 ROUND KEYS</div><div class="hex-box" style="max-height:120px; overflow-y:auto;">${rks}</div></div>`;
           } else if (step === 2) {
-            html = `<div class="step-info">Operasi XOR antara plaintext dengan Round Key 0.</div><div class="aes-card"><div class="aes-card-title">📄 PLAINTEXT PREVIEW</div><div class="hex-box">${prepData.steps_info.initial.description}</div></div>`;
+            html = `
+              <div class="step-info">Tahap awal enkripsi di mana plaintext dilakukan operasi XOR dengan Round Key 0 (hasil optimasi GA).</div>
+              <div class="aes-card">
+                <div class="aes-card-title">📄 PLAINTEXT (HEX PREVIEW)</div>
+                <div class="hex-box">${prepData.steps_info.initial.plaintext_hex}</div>
+              </div>
+              <div class="aes-card">
+                <div class="aes-card-title">🔑 ROUND KEY (ROUND 0)</div>
+                <div class="hex-box">${prepData.round_keys[0].key_hex}</div>
+              </div>
+              <div class="aes-card" style="border-left: 4px solid #1f6feb;">
+                <div class="aes-card-title">⚡ HASIL XOR (STATE AWAL)</div>
+                <div class="hex-box" style="background: #eef5ff;">${prepData.steps_info.initial.state_after_hex}</div>
+              </div>
+            `;
           } else if (step === 3) {
             html = `<div class="step-info">9 putaran utama transformasi AES standar.</div><div class="aes-card"><div class="aes-card-title">⚙️ TRANSFORMASI</div><div style="font-size:12px; padding:5px;">SubBytes ⮕ ShiftRows ⮕ MixColumns ⮕ AddRoundKey</div></div><div class="badge-info">Pengulangan Round 1-9</div>`;
           } else {
@@ -524,7 +564,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           const r = await Swal.fire({
-            html: `${renderProcessStepper(step, steps)}${html}`,
+            html: `${renderProcessStepper(step, steps, true)}${html}`,
             width: "600px", showCancelButton: true, showDenyButton: step > 1,
             confirmButtonText: step === 4 ? "SELESAI" : "LANJUT", denyButtonText: "KEMBALI", cancelButtonText: "BATAL",
             buttonsStyling: false, customClass: { confirmButton: `custom-swal-btn ${step === 4 ? 'swal-btn-finish' : 'swal-btn-next'}`, denyButton: 'custom-swal-btn swal-btn-back', cancelButton: 'custom-swal-btn swal-btn-cancel' }
