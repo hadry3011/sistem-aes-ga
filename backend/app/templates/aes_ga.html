@@ -24,40 +24,6 @@
         <input id="fileIn" type="file" accept=".pdf,.docx" />
       </div>
 
-      <!-- ADVANCED GA SETTINGS -->
-      <div style="margin-top: 15px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;">
-        <details>
-          <summary style="cursor: pointer; font-weight: bold; color: #333;">⚙️ Advanced GA Settings (Optional)</summary>
-          <div style="margin-top: 15px;" class="row">
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-              <div>
-                <label for="population" style="font-size: 13px;">Population</label>
-                <input type="number" id="population" value="60" min="4" max="200" style="width: 100%; padding: 5px;">
-              </div>
-              <div>
-                <label for="generations" style="font-size: 13px;">Generations</label>
-                <input type="number" id="generations" value="80" min="1" max="500" style="width: 100%; padding: 5px;">
-              </div>
-              <div>
-                <label for="fitness_threshold" style="font-size: 13px;">Threshold</label>
-                <input type="number" id="fitness_threshold" value="0.95" min="0.1" max="1.0" step="0.001" style="width: 100%; padding: 5px;">
-              </div>
-              <div>
-                <label for="crossover_rate" style="font-size: 13px;">Crossover Rate</label>
-                <input type="number" id="crossover_rate" value="0.8" step="0.1" min="0" max="1" style="width: 100%; padding: 5px;">
-              </div>
-              <div>
-                <label for="mutation_rate" style="font-size: 13px;">Mutation Rate</label>
-                <input type="number" id="mutation_rate" value="0.05" step="0.01" min="0" max="1" style="width: 100%; padding: 5px;">
-              </div>
-            </div>
-          </div>
-          <p style="margin-top: 10px; font-size: 12px; color: #666;">
-            💡 <b>Tips Test GAGAL:</b> Population=4, Generations=3, Mutation Rate=0.0, Threshold=0.99
-          </p>
-        </details>
-      </div>
-
       <div class="file-info">
         <div><b>File:</b> <span id="fname">-</span></div>
         <div><b>Ukuran:</b> <span id="fsize">-</span></div>
