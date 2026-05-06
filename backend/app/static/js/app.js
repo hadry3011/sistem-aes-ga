@@ -321,12 +321,7 @@ document.addEventListener("DOMContentLoaded", () => {
           
           if (currentStep === 1) {
             // STEP 1: KEY EXPANSION
-            const rkHtml = prepData.round_keys.map(rk => `
-              <div style="margin-bottom: 5px; display: flex; justify-content: space-between; font-size: 11px;">
-                <span style="color: #6a737d; font-weight: bold;">Round ${String(rk.round).padStart(2, '0')}:</span>
-                <span style="color: #032f62;">${rk.key_hex}</span>
-              </div>
-            `).join("");
+            const rkHtml = prepData.round_keys.map(rk => `<div style="font-size: 11px; font-family: monospace;">Round ${String(rk.round).padStart(2, '0')}: ${rk.key_hex}</div>`).join("");
 
             stepContent = `
               <!--
@@ -448,13 +443,17 @@ document.addEventListener("DOMContentLoaded", () => {
           if (data.ok) {
             // Masukkan ke field yang sudah ada
             cipherEl.value = data.package.cipher_b64;
+
+            // UPDATE METADATA UNTUK HISTORI
             lastMeta.encrypt_ms = data.package.meta.encrypt_ms;
-            
+            lastMeta.key_hex = data.package.key_hex || "-";
+            lastMeta.filename = data.package.filename || "-";
+            lastMeta.size_kb = (f.size / 1024).toFixed(2);
+
             const encTime = gid("encrypt_time");
             if (encTime) encTime.value = data.package.meta.encrypt_ms;
-            
-            setAfterEncryptSuccess();
-            
+
+            setAfterEncryptSuccess();            
             await Swal.fire({
               title: "BERHASIL!",
               text: "Proses enkripsi AES-128 telah selesai sempurna.",
@@ -501,12 +500,7 @@ document.addEventListener("DOMContentLoaded", () => {
           
           if (currentStep === 1) {
             // STEP 1: KEY EXPANSION
-            const rkHtml = prepData.round_keys.map(rk => `
-              <div style="margin-bottom: 5px; display: flex; justify-content: space-between; font-size: 11px;">
-                <span style="color: #6a737d; font-weight: bold;">Round ${String(rk.round).padStart(2, '0')}:</span>
-                <span style="color: #032f62;">${rk.key_hex}</span>
-              </div>
-            `).join("");
+            const rkHtml = prepData.round_keys.map(rk => `<div style="font-size: 11px; font-family: monospace;">Round ${String(rk.round).padStart(2, '0')}: ${rk.key_hex}</div>`).join("");
 
             stepContent = `
               <!--
@@ -786,6 +780,38 @@ document.addEventListener("DOMContentLoaded", () => {
         showAlert("Error", String(e), "error");
       } finally {
         btnSaveHistory.disabled = false;
+      }
+    });
+  }
+
+  // RESET HISTORY
+  const btnResetHistory = gid("btnResetHistory");
+  if (btnResetHistory) {
+    btnResetHistory.addEventListener("click", async () => {
+      const confirm = await Swal.fire({
+        title: "Konfirmasi Reset",
+        text: "Semua data histori di server akan dihapus permanen. Lanjutkan?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "YA, RESET",
+        cancelButtonText: "BATAL",
+        buttonsStyling: false,
+        customClass: {
+          confirmButton: 'custom-swal-btn swal-btn-cancel', // Warna merah
+          cancelButton: 'custom-swal-btn swal-btn-next'
+        }
+      });
+
+      if (confirm.isConfirmed) {
+        try {
+          const res = await fetch("/api/history/reset", { method: "POST" });
+          const data = await res.json();
+          if (data.ok) {
+            showAlert("Berhasil", "Histori telah dibersihkan. Pengujian berikutnya akan dimulai dari awal.", "success");
+          }
+        } catch (e) {
+          showAlert("Error", String(e), "error");
+        }
       }
     });
   }

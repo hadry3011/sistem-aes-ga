@@ -206,9 +206,18 @@ def aes_encrypt_file():
     }
         }
 
-    # ✅ DIHAPUS: pemanggilan aes_export_xlsx() dari sini
-    # Karena export_xlsx butuh JSON payload dari client.
-    # History akan disimpan ketika user klik tombol "Save History (XLSX)".
+    # ✅ SIMPAN KE HISTORI OTOMATIS
+    try:
+        hist_data = {
+            "mode": package["mode"],
+            "filename": package["filename"],
+            "size_kb": round(len(raw) / 1024, 2),
+            "key_hex": package["key_hex"],
+            "encrypt_ms": enc_ms
+        }
+        save_baseline_history(hist_data)
+    except Exception as e:
+        app_logger.error(f"Gagal simpan histori baseline: {e}")
 
     return jsonify(ok=True, package=package), 200
 
@@ -462,60 +471,61 @@ def aes_decrypt_package():
     return resp
 
 # =========================
-# AES EXPORT XLSX
+# HISTORY HELPERS
 # =========================
-@bp.post("/api/aes/export_xlsx")
-def aes_export_xlsx():
-    data = request.get_json(silent=True)
-    if not data:
-        return jsonify(ok=False, error="Data tidak valid"), 400
 
-    # key_hex
-    try:
-        key_hex = (data.get("key_hex") or "").strip()
-        if not key_hex:
-            key_hex = base64.b64decode(data.get("key", "")).hex()
-    except Exception:
-        key_hex = "-"
-
-    file_path = "aes_baseline_history.xlsx"
-
-    headers = [
-        "timestamp",
-        "mode",
-        "file",
-        "ukuran_kb",
-        "key_hex",
-        "encrypt_ms",
-        "decrypt_ms",
-        "entropy_cipher",
-        "nist_frequency",
-        "nist_runs",
-        "nist_freq_p",
-        "nist_runs_p",
-        "catatan"
-    ]
-
+def _append_to_xlsx(file_path, headers, row_data):
+    needs_new_file = False
     if os.path.exists(file_path):
-        wb = load_workbook(file_path)
-        ws = wb.active
-        # jika sheet kosong, tulis header
-        if ws.max_row == 0:
-            ws.append(headers)
-        # kalau header lama tidak sama, tetap aman: kalau baris 1 bukan header, tambahkan header baru
-        else:
-            first_row = [c.value for c in ws[1]]
-            if first_row != headers:
-                # jangan merusak file lama, tambahkan header versi baru di baris berikutnya sebagai penanda
-                # (opsional) kamu bisa hapus ini kalau ingin strict
-                pass
+        try:
+            wb = load_workbook(file_path)
+            ws = wb.active
+            if ws.max_row >= 1:
+                first_row = [str(c.value) for c in ws[1]]
+                if first_row != [str(h) for h in headers]:
+                    # Header tidak cocok, backup file lama
+                    needs_new_file = True
+        except Exception:
+            needs_new_file = True
     else:
+        needs_new_file = True
+
+    if needs_new_file:
+        if os.path.exists(file_path):
+            bak_path = file_path + f".{int(time.time())}.bak"
+            os.rename(file_path, bak_path)
         wb = Workbook()
         ws = wb.active
-        ws.title = "AES_History"
+        ws.title = "History"
         ws.append(headers)
+    else:
+        # ws sudah terdefinisi dari load_workbook diatas
+        pass
 
-    ws.append([
+    ws.append(row_data)
+
+    for col in range(1, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(col)].width = 22
+
+    wb.save(file_path)
+    return wb
+
+def save_baseline_history(data):
+    file_path = "aes_baseline_history.xlsx"
+    headers = [
+        "timestamp", "mode", "file", "ukuran_kb", "key_hex",
+        "encrypt_ms", "decrypt_ms", "entropy_cipher",
+        "nist_frequency", "nist_runs", "nist_freq_p", "nist_runs_p", "catatan"
+    ]
+    
+    key_hex = (data.get("key_hex") or "").strip().upper()
+    if not key_hex and data.get("key"):
+        try:
+            key_hex = base64.b64decode(data.get("key")).hex().upper()
+        except:
+            key_hex = "-"
+
+    row = [
         datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         data.get("mode", "AES-128-BASELINE"),
         data.get("filename", "-"),
@@ -528,13 +538,90 @@ def aes_export_xlsx():
         data.get("nist_runs", "-"),
         data.get("nist_freq_p", "-"),
         data.get("nist_runs_p", "-"),
-        ""
-    ])
+        data.get("catatan", "")
+    ]
+    return _append_to_xlsx(file_path, headers, row)
 
-    for col in range(1, len(headers) + 1):
-        ws.column_dimensions[get_column_letter(col)].width = 22
+def save_ga_history(data):
+    file_path = "aes_ga_history.xlsx"
+    headers = [
+        "timestamp", "mode", "file", "ukuran_kb", "key_hex",
+        "encrypt_ms", "decrypt_ms", "entropy_cipher",
+        "nist_frequency", "nist_runs", "nist_freq_p", "nist_runs_p",
+        "populasi", "jumlah_parent", "jumlah_crossover", "jumlah_mutasi", "fitness_best", "generasi_ke",
+        "catatan"
+    ]
 
-    wb.save(file_path)
+    key_hex = (data.get("key_hex") or "").strip().upper()
+    if not key_hex and data.get("key"):
+        try:
+            key_hex = base64.b64decode(data.get("key")).hex().upper()
+        except:
+            key_hex = "-"
+
+    # Ambil parameter GA dari ga_state jika tidak ada di data
+    ga_params = {}
+    if key_hex != "-":
+        for sid, st in ga_state.GA_SESSIONS.items():
+            if st.best_key_hex and st.best_key_hex.upper() == key_hex:
+                meta = st.ga_meta or {}
+                ga_params = {
+                    "populasi": meta.get("population", "-"),
+                    "jumlah_parent": meta.get("population", 0) // 2 if "population" in meta else "-",
+                    "jumlah_crossover": meta.get("total_crossover", "-"),
+                    "jumlah_mutasi": meta.get("total_mutation", "-"),
+                    "fitness_best": meta.get("best_fitness", "-"),
+                    "generasi_ke": meta.get("generations", "-")
+                }
+                break
+    
+    populasi = data.get("populasi") or ga_params.get("populasi", "-")
+    j_parent = data.get("jumlah_parent") or ga_params.get("jumlah_parent", "-")
+    j_cross = data.get("jumlah_crossover") or ga_params.get("jumlah_crossover", "-")
+    j_mut = data.get("jumlah_mutasi") or ga_params.get("jumlah_mutasi", "-")
+    fit = data.get("fitness_best") or ga_params.get("fitness_best", "-")
+    gen = data.get("generasi_ke") or ga_params.get("generasi_ke", "-")
+
+    row = [
+        datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        data.get("mode", "AES-128-GA"),
+        data.get("filename", "-"),
+        data.get("size_kb", "-"),
+        key_hex,
+        data.get("encrypt_ms", "-"),
+        data.get("decrypt_ms", "-"),
+        data.get("entropy_cipher", "-"),
+        data.get("nist_frequency", "-"),
+        data.get("nist_runs", "-"),
+        data.get("nist_freq_p", "-"),
+        data.get("nist_runs_p", "-"),
+        populasi,
+        j_parent,
+        j_cross,
+        j_mut,
+        fit,
+        gen,
+        data.get("catatan", "")
+    ]
+    return _append_to_xlsx(file_path, headers, row)
+
+# =========================
+# AES EXPORT XLSX
+# =========================
+@bp.post("/api/aes/export_xlsx")
+def aes_export_xlsx():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify(ok=False, error="Data tidak valid"), 400
+
+    mode = data.get("mode", "AES-128-BASELINE")
+    
+    if "GA" in mode:
+        wb = save_ga_history(data)
+        download_name = "aes_ga_history.xlsx"
+    else:
+        wb = save_baseline_history(data)
+        download_name = "aes_baseline_history.xlsx"
 
     bio = io.BytesIO()
     wb.save(bio)
@@ -543,7 +630,7 @@ def aes_export_xlsx():
     return send_file(
         bio,
         as_attachment=True,
-        download_name="aes_baseline_history.xlsx",
+        download_name=download_name,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
@@ -873,6 +960,19 @@ def aesga_encrypt_file():
     }
 }
 
+    # ✅ SIMPAN KE HISTORI OTOMATIS
+    try:
+        hist_data = {
+            "mode": package["mode"],
+            "filename": package["filename"],
+            "size_kb": round(len(raw) / 1024, 2),
+            "key_hex": package["key_hex"],
+            "encrypt_ms": enc_ms
+        }
+        save_ga_history(hist_data)
+    except Exception as e:
+        app_logger.error(f"Gagal simpan histori GA: {e}")
+
     return jsonify(ok=True, package=package), 200
 
 # =========================
@@ -1089,3 +1189,16 @@ def aesga_decrypt_info():
 @bp.get("/aes_ga")
 def aes_ga():
     return render_template("aes_ga.html")
+
+# =========================
+# RESET HISTORY
+# =========================
+@bp.post("/api/history/reset")
+def history_reset():
+    files = ["aes_baseline_history.xlsx", "aes_ga_history.xlsx"]
+    removed = []
+    for f in files:
+        if os.path.exists(f):
+            os.remove(f)
+            removed.append(f)
+    return jsonify(ok=True, removed=removed)

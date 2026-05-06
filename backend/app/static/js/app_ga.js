@@ -93,11 +93,11 @@ function esc(s) {
  */
 function renderGAEvolutionStepper(currentStep, currentGen, totalGen) {
   const steps = [
-    { id: 'init', label: 'Init' },
-    { id: 'eval', label: 'Eval' },
-    { id: 'select', label: 'Select' },
-    { id: 'cross', label: 'Cross' },
-    { id: 'mutate', label: 'Mutate' },
+    { id: 'init', label: 'Inisialisasi' },
+    { id: 'eval', label: 'Evaluasi' },
+    { id: 'select', label: 'Seleksi' },
+    { id: 'cross', label: 'Cross-over' },
+    { id: 'mutate', label: 'Mutasi' },
     { id: 'result', label: 'Hasil' }
   ];
 
@@ -531,11 +531,16 @@ document.addEventListener("DOMContentLoaded", () => {
           keyB64El.value = data.package.key_b64;
           keyHexEl.value = data.package.key_hex;
           encTimeEl.value = data.package.meta.encrypt_ms;
+
+          // UPDATE METADATA UNTUK HISTORI
           lastMeta.encrypt_ms = data.package.meta.encrypt_ms;
+          lastMeta.key_hex = data.package.key_hex || "-";
+          lastMeta.filename = data.package.filename || "-";
+          lastMeta.size_kb = (f.size / 1024).toFixed(2);
+
           setEnabled(btnDec, true); setEnabled(btnSaveHistory, true); setEnabled(btnEntropy, true); setEnabled(btnNist, true);
           showAlert("Berhasil", "Enkripsi AES+GA Selesai.", "success");
-        }
-      } catch (e) { showAlert("Error", e.message, "error"); } finally { setEnabled(btnEncFile, true); }
+        }      } catch (e) { showAlert("Error", e.message, "error"); } finally { setEnabled(btnEncFile, true); }
     });
   }
 
@@ -647,6 +652,36 @@ document.addEventListener("DOMContentLoaded", () => {
         const a = document.createElement("a"); a.href = url; a.download = "aes_history.xlsx"; a.click(); URL.revokeObjectURL(url);
         showAlert("Sukses", "Histori berhasil diunduh.", "success");
       } catch (e) { showAlert("Error", String(e), "error"); }
+    });
+  }
+
+  // RESET HISTORY
+  const btnResetHistory = gid("btnResetHistory");
+  if (btnResetHistory) {
+    btnResetHistory.addEventListener("click", async () => {
+      const confirm = await Swal.fire({
+        title: "Konfirmasi Reset",
+        text: "Semua data histori di server akan dihapus permanen. Lanjutkan?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "YA, RESET",
+        cancelButtonText: "BATAL",
+        buttonsStyling: false,
+        customClass: {
+          confirmButton: 'custom-swal-btn swal-btn-cancel', // Warna merah
+          cancelButton: 'custom-swal-btn swal-btn-next'
+        }
+      });
+
+      if (confirm.isConfirmed) {
+        try {
+          const res = await fetch("/api/history/reset", { method: "POST" });
+          const data = await res.json();
+          if (data.ok) {
+            showAlert("Berhasil", "Histori telah dibersihkan. Pengujian berikutnya akan dimulai dari awal.", "success");
+          }
+        } catch (e) { showAlert("Error", String(e), "error"); }
+      }
     });
   }
 });
