@@ -83,6 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnEncFile = gid("btnEncFile");
   const btnEntropy = gid("btnEntropy");
   const btnNist = gid("btnNist");
+  const btnBerTest = gid("btnBerTest");
   const btnDec = gid("btnDec");
   const btnSaveHistory = gid("btnSaveHistory");
   const btnBackToHome = gid("btnBackToHome");
@@ -111,7 +112,9 @@ document.addEventListener("DOMContentLoaded", () => {
     nist_frequency: "-",
     nist_runs: "-",
     nist_freq_p: "-",
-    nist_runs_p: "-"
+    nist_runs_p: "-",
+    ber_value: "-",
+    ber_percentage: "-"
   };
 
   let generatedKeyB64 = null;
@@ -444,6 +447,13 @@ document.addEventListener("DOMContentLoaded", () => {
             // Masukkan ke field yang sudah ada
             cipherEl.value = data.package.cipher_b64;
 
+            // SIMPAN KE LOCALSTORAGE UNTUK BER
+            localStorage.setItem("aes_baseline_result", JSON.stringify({
+              cipher_b64: data.package.cipher_b64,
+              filename: f.name,
+              size: f.size
+            }));
+
             // UPDATE METADATA UNTUK HISTORI
             lastMeta.encrypt_ms = data.package.meta.encrypt_ms;
             lastMeta.key_hex = data.package.key_hex || "-";
@@ -453,7 +463,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const encTime = gid("encrypt_time");
             if (encTime) encTime.value = data.package.meta.encrypt_ms;
 
-            setAfterEncryptSuccess();            
+            setAfterEncryptSuccess();
+            if (typeof updateBerButtonState === "function") updateBerButtonState();
             await Swal.fire({
               title: "BERHASIL!",
               text: "Proses enkripsi AES-128 telah selesai sempurna.",
@@ -812,6 +823,95 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {
           showAlert("Error", String(e), "error");
         }
+      }
+    });
+  }
+
+  // BER TEST
+  function updateBerButtonState() {
+    if (!btnBerTest) return;
+    const b = localStorage.getItem("aes_baseline_result");
+    const g = localStorage.getItem("aes_ga_result");
+    if (b && g) {
+      // Optional: check if same file
+      const bd = JSON.parse(b);
+      const gd = JSON.parse(g);
+      if (bd.filename === gd.filename && bd.size === gd.size) {
+        btnBerTest.disabled = false;
+        btnBerTest.title = "Bandingkan BER Baseline vs GA";
+      } else {
+        btnBerTest.disabled = true;
+        btnBerTest.title = "Ciphertext berasal dari file berbeda";
+      }
+    } else {
+      btnBerTest.disabled = true;
+      btnBerTest.title = "Kedua ciphertext diperlukan (Baseline & GA)";
+    }
+  }
+  updateBerButtonState();
+
+  if (btnBerTest) {
+    btnBerTest.addEventListener("click", async () => {
+      const cipherBaseline = localStorage.getItem("aes_baseline_result");
+      const cipherGA = localStorage.getItem("aes_ga_result");
+
+      if (!cipherBaseline || !cipherGA) {
+        showAlert("Informasi", "Kedua ciphertext (Baseline & GA) diperlukan. Pastikan Anda telah melakukan enkripsi di kedua halaman.", "info");
+        return;
+      }
+
+      const baselineData = JSON.parse(cipherBaseline);
+      const gaData = JSON.parse(cipherGA);
+
+      // Validasi file yang sama
+      if (baselineData.filename !== gaData.filename || baselineData.size !== gaData.size) {
+        showAlert("Error", "Ciphertext berasal dari file yang berbeda. Harap gunakan file yang sama untuk pengujian BER.", "error");
+        return;
+      }
+
+      try {
+        btnBerTest.disabled = true;
+        const res = await fetch("/api/ber/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cipher_baseline_b64: baselineData.cipher_b64,
+            cipher_ga_b64: gaData.cipher_b64
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          const r = data.results;
+          // UPDATE METADATA UNTUK HISTORI
+          lastMeta.ber_value = r.ber_value.toFixed(6);
+          lastMeta.ber_percentage = r.percentage.toFixed(4) + "%";
+
+          const html = `
+            <div style="text-align: left; font-size: 14px;">
+              <p><b>Different Bits:</b> ${r.different_bits}</p>
+              <p><b>Total Bits:</b> ${r.total_bits}</p>
+              <p><b>BER Value:</b> ${r.ber_value.toFixed(6)}</p>
+              <p><b>Bit Change Percentage:</b> ${r.percentage.toFixed(4)}%</p>
+              <hr>
+              <p style="font-size: 12px; color: #666;">* Membandingkan ciphertext AES Baseline vs AES+GA</p>
+            </div>
+          `;
+          Swal.fire({
+            title: "Bit Error Rate (BER) Result",
+            html: html,
+            icon: "success",
+            confirmButtonText: "Selesai"
+          });
+          if (gid("resultBer")) {
+            gid("resultBer").innerHTML = `<div style="padding:10px; background:#f3e5f5; border:1px solid #9c27b0; border-radius:8px; color:#7b1fa2; font-weight:bold;">BER: ${r.ber_value.toFixed(6)} (${r.percentage.toFixed(2)}%)</div>`;
+          }
+        } else {
+          showAlert("Error", data.error || "Gagal hitung BER", "error");
+        }
+      } catch (e) {
+        showAlert("Error", String(e), "error");
+      } finally {
+        btnBerTest.disabled = false;
       }
     });
   }

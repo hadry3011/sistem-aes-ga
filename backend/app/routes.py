@@ -18,6 +18,7 @@ from app.crypto import aes_engine
 from app.ga import ga_state
 from app.ga.ga_keygen import ga_generate_key_hex, TraceConfig
 from app.utils.logger import app_logger
+from app.utils.ber import calculate_ber
 
 print(">>> ROUTES.PY YANG DIPAKAI:", __file__)
 
@@ -515,9 +516,10 @@ def save_baseline_history(data):
     headers = [
         "timestamp", "mode", "file", "ukuran_kb", "key_hex",
         "encrypt_ms", "decrypt_ms", "entropy_cipher",
-        "nist_frequency", "nist_runs", "nist_freq_p", "nist_runs_p", "catatan"
+        "nist_frequency", "nist_runs", "nist_freq_p", "nist_runs_p", 
+        "ber_value", "ber_percentage", "catatan"
     ]
-    
+
     key_hex = (data.get("key_hex") or "").strip().upper()
     if not key_hex and data.get("key"):
         try:
@@ -538,8 +540,11 @@ def save_baseline_history(data):
         data.get("nist_runs", "-"),
         data.get("nist_freq_p", "-"),
         data.get("nist_runs_p", "-"),
+        data.get("ber_value", "-"),
+        data.get("ber_percentage", "-"),
         data.get("catatan", "")
     ]
+
     return _append_to_xlsx(file_path, headers, row)
 
 def save_ga_history(data):
@@ -549,7 +554,7 @@ def save_ga_history(data):
         "encrypt_ms", "decrypt_ms", "entropy_cipher",
         "nist_frequency", "nist_runs", "nist_freq_p", "nist_runs_p",
         "populasi", "jumlah_parent", "jumlah_crossover", "jumlah_mutasi", "fitness_best", "generasi_ke",
-        "catatan"
+        "ber_value", "ber_percentage", "catatan"
     ]
 
     key_hex = (data.get("key_hex") or "").strip().upper()
@@ -601,6 +606,8 @@ def save_ga_history(data):
         j_mut,
         fit,
         gen,
+        data.get("ber_value", "-"),
+        data.get("ber_percentage", "-"),
         data.get("catatan", "")
     ]
     return _append_to_xlsx(file_path, headers, row)
@@ -1202,3 +1209,21 @@ def history_reset():
             os.remove(f)
             removed.append(f)
     return jsonify(ok=True, removed=removed)
+
+# =========================
+# BER TEST
+# =========================
+@bp.post("/api/ber/test")
+def ber_test():
+    data = request.get_json(silent=True) or {}
+    c1 = data.get("cipher_baseline_b64")
+    c2 = data.get("cipher_ga_b64")
+    
+    if not c1 or not c2:
+        return jsonify(ok=False, error="Kedua ciphertext diperlukan untuk pengujian BER."), 400
+        
+    try:
+        results = calculate_ber(c1, c2)
+        return jsonify(ok=True, results=results), 200
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 400
