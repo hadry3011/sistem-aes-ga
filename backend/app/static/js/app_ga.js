@@ -316,6 +316,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const gaKeyHexDisplay = gid("ga_key_hex_display");
   const gaInfoEl = gid("ga_info");
   const gaResult = gid("gaResult");
+  const BER_SESSION_KEY = "aes_ber_session_id";
+  localStorage.removeItem("aes_ga_result");
+
+  function currentBerSessionId() {
+    return sessionStorage.getItem(BER_SESSION_KEY);
+  }
+
+  function getStoredJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key));
+    } catch (e) {
+      localStorage.removeItem(key);
+      return null;
+    }
+  }
+
+  function isCurrentBerResult(data) {
+    const sessionId = currentBerSessionId();
+    return Boolean(sessionId && data && data.session_id === sessionId);
+  }
 
   let gaKeyB64 = null;
   let gaKeyHex = null;
@@ -340,6 +360,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (fileIn) {
     fileIn.addEventListener("change", () => {
       const f = fileIn.files && fileIn.files[0];
+      localStorage.removeItem("aes_ga_result");
+      if (gid("resultBer")) gid("resultBer").innerHTML = "";
+      if (typeof updateBerButtonState === "function") updateBerButtonState();
       if (!f) return;
       gid("fname").textContent = f.name;
       gid("fsize").textContent = (f.size / 1024).toFixed(2) + " KB";
@@ -539,7 +562,8 @@ document.addEventListener("DOMContentLoaded", () => {
           localStorage.setItem("aes_ga_result", JSON.stringify({
             cipher_b64: data.package.cipher_b64,
             filename: f.name,
-            size: f.size
+            size: f.size,
+            session_id: currentBerSessionId()
           }));
 
           // UPDATE METADATA UNTUK HISTORI
@@ -690,6 +714,9 @@ document.addEventListener("DOMContentLoaded", () => {
           const data = await res.json();
           if (data.ok) {
             showAlert("Berhasil", "Histori telah dibersihkan. Pengujian berikutnya akan dimulai dari awal.", "success");
+            localStorage.removeItem("aes_baseline_result");
+            localStorage.removeItem("aes_ga_result");
+            updateBerButtonState();
           }
         } catch (e) { showAlert("Error", String(e), "error"); }
       }
@@ -699,11 +726,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // BER TEST
   function updateBerButtonState() {
     if (!btnBerTest) return;
-    const b = localStorage.getItem("aes_baseline_result");
-    const g = localStorage.getItem("aes_ga_result");
-    if (b && g) {
-      const bd = JSON.parse(b);
-      const gd = JSON.parse(g);
+    const bd = getStoredJson("aes_baseline_result");
+    const gd = getStoredJson("aes_ga_result");
+    if (isCurrentBerResult(bd) && isCurrentBerResult(gd)) {
       if (bd.filename === gd.filename && bd.size === gd.size) {
         btnBerTest.disabled = false;
         btnBerTest.title = "Bandingkan BER Baseline vs GA";
@@ -720,20 +745,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (btnBerTest) {
     btnBerTest.addEventListener("click", async () => {
-      const cipherBaseline = localStorage.getItem("aes_baseline_result");
-      const cipherGA = localStorage.getItem("aes_ga_result");
+      const baselineData = getStoredJson("aes_baseline_result");
+      const gaData = getStoredJson("aes_ga_result");
 
-      if (!cipherBaseline || !cipherGA) {
+      if (!isCurrentBerResult(baselineData) || !isCurrentBerResult(gaData)) {
         showAlert("Informasi", "Kedua ciphertext (Baseline & GA) diperlukan. Pastikan Anda telah melakukan enkripsi di kedua halaman.", "info");
+        updateBerButtonState();
         return;
       }
-
-      const baselineData = JSON.parse(cipherBaseline);
-      const gaData = JSON.parse(cipherGA);
 
       // Validasi file yang sama
       if (baselineData.filename !== gaData.filename || baselineData.size !== gaData.size) {
         showAlert("Error", "Ciphertext berasal dari file yang berbeda. Harap gunakan file yang sama untuk pengujian BER.", "error");
+        updateBerButtonState();
         return;
       }
 
@@ -779,7 +803,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (e) {
         showAlert("Error", String(e), "error");
       } finally {
-        btnBerTest.disabled = false;
+        updateBerButtonState();
       }
     });
   }

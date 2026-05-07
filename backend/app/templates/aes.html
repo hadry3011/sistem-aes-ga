@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />
@@ -116,13 +116,13 @@
           <div id="resultNistBlockFreq" class="test-result"></div>
           <div id="resultNistRuns" class="test-result"></div>
 
-          <button id="btnBerTest" class="menu-button" style="background-color: #6f42c1;">BER Test</button>
+          <button id="btnBerTest" class="menu-button" style="background-color: #1f6feb;">BER Test</button>
           <div id="resultBer" class="test-result"></div>
         </div>
         <div>
           <button id="btnDec" class="menu-button">Dekrip & Download</button>
           <button id="btnSaveHistory" class="menu-button">Save History (XLSX)</button>
-          <button id="btnResetHistory" class="menu-button" style="background-color: #d93025;">Reset History</button>
+          <button id="btnResetHistory" class="menu-button" style="background-color: #1f6feb;">Reset History</button>
         </div>
       </div>
 
@@ -136,6 +136,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.9/dist/sweetalert2.all.min.js"></script>
-  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=2"></script>
 </body>
 </html>
