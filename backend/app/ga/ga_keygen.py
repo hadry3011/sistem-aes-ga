@@ -174,10 +174,13 @@ def ga_generate_key_hex(
             # 3. CROSSOVER (Berdasarkan hasil seleksi)
             children = []
             c_log = []
+            num_pairs = num_selected // 2
+            num_crossover = round(num_pairs * crossover_rate)
             # REVISI: Proses crossover hanya menggunakan parent yang terpilih dari hasil seleksi
             for i in range(0, num_selected, 2):
+                pair_index = i // 2
                 p1, p2 = selected_parents[i][1], selected_parents[i+1][1]
-                if rnd.random() < crossover_rate:
+                if pair_index < num_crossover:
                     cp1, cp2 = rnd.randrange(1, 8), rnd.randrange(8, 16)
                     child = p1[:cp1] + p2[cp1:cp2] + p1[cp2:]
                     p_desc = f"{cp1}&{cp2}"
@@ -192,18 +195,16 @@ def ga_generate_key_hex(
                 full_trace.append({"step": s_step, "sub_step": "cross", "gen": gen_num, "step_name": f"Crossover Gen {gen_num}", "crossover": c_log, "crossover_count": len(c_log)})
 
             # 4. MUTASI (Tampilkan SEMUA 15)
-            # Mutasi adaptif: Jika stagnan, mutasi naik drastis
-            eff_mut = mutation_rate if no_improve < 10 else 0.4 
+            # Mutasi adaptif: Jika stagnan, mutasi naik drastis 
             mutated_children = []
             m_log = []
             for idx, child in enumerate(children):
                 kb, mut, m_p = bytearray(child), False, []
                 before = bytes(kb)
-                for b_idx in range(16):
-                    if rnd.random() < eff_mut:
-                        kb[b_idx] = rnd.getrandbits(8)
-                        mut = True
-                        m_p.append(b_idx)
+                mutasi_pos = rnd.randrange(0, 16)
+                kb[mutasi_pos] = rnd.getrandbits(8)
+                mut = True
+                m_p.append(mutasi_pos)
                 res_child = bytes(kb)
                 mutated_children.append(res_child)
                 if trace_cfg and trace_cfg.enabled:
